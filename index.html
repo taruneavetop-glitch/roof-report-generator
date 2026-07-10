@@ -1,0 +1,1272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Roof Report Generator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --blue:#2563eb; --blue-dark:#1d4ed8; --blue-50:#eff6ff; --blue-100:#dbeafe; --blue-200:#bfdbfe; --blue-700:#1d4ed8;
+    --green:#16a34a; --green-dark:#15803d; --green-50:#f0fdf4; --green-200:#bbf7d0; --green-700:#15803d;
+    --red:#ef4444; --red-50:#fef2f2; --red-200:#fecaca; --red-700:#b91c1c;
+    --slate-50:#f8fafc; --slate-100:#f1f5f9; --slate-200:#e2e8f0; --slate-300:#cbd5e1;
+    --slate-400:#94a3b8; --slate-500:#64748b; --slate-600:#475569; --slate-700:#334155; --slate-800:#1e293b;
+  }
+  *{box-sizing:border-box;}
+  /* Safety-net default so any icon not covered by a more specific rule below
+     still renders at a sane size instead of the browser's huge unstyled SVG default. */
+  svg{width:16px; height:16px; flex-shrink:0;}
+  body{
+    margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:linear-gradient(135deg,var(--slate-50),#eff6ff55,var(--slate-100));
+    color:var(--slate-800); min-height:100vh;
+  }
+  header.app-header{
+    background:#fff; border-bottom:1px solid var(--slate-200); box-shadow:0 1px 2px rgba(0,0,0,.04);
+  }
+  .header-inner{max-width:900px; margin:0 auto; padding:16px 24px; display:flex; align-items:center; gap:12px;}
+  .logo{width:36px; height:36px; border-radius:10px; background:var(--blue); display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow:0 2px 6px rgba(37,99,235,.4);}
+  .logo svg{width:20px; height:20px; fill:#fff;}
+  .header-inner h1{font-size:17px; font-weight:700; margin:0; line-height:1.2; color:var(--slate-800);}
+  .header-inner p{font-size:12px; color:var(--slate-500); margin:2px 0 0;}
+  main{max-width:900px; margin:0 auto; padding:28px 24px 60px; display:flex; flex-direction:column; gap:20px;}
+
+  .card{background:#fff; border:1px solid var(--slate-200); border-radius:12px; box-shadow:0 1px 2px rgba(0,0,0,.04);}
+  .card-pad{padding:20px;}
+
+  .info-banner{
+    display:flex; gap:10px; align-items:flex-start; background:var(--blue-50); border:1px solid var(--blue-200);
+    border-radius:12px; padding:12px 16px; font-size:12.5px; color:#1e40af; line-height:1.6;
+  }
+  .info-banner svg{flex-shrink:0; margin-top:2px; width:16px; height:16px; fill:var(--blue);}
+
+  h2.section-title{font-size:14px; font-weight:600; color:var(--slate-700); margin:0 0 14px;}
+  label.field-label{display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; color:var(--slate-600); margin-bottom:6px;}
+  label.field-label svg{width:13px; height:13px; fill:var(--blue);}
+  input[type=text]{
+    width:100%; border:1px solid var(--slate-300); border-radius:8px; padding:9px 12px; font-size:14px; color:var(--slate-800);
+    outline:none; transition:.15s;
+  }
+  input[type=text]:focus{border-color:var(--blue); box-shadow:0 0 0 3px rgba(37,99,235,.15);}
+  input[type=text]::placeholder{color:var(--slate-400);}
+  .grid-2{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+  @media (max-width:640px){.grid-2{grid-template-columns:1fr;}}
+  .grid-3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px;}
+  @media (max-width:760px){.grid-3{grid-template-columns:1fr;}}
+
+  .structures-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:2px;}
+  .structures-head .left{display:flex; align-items:center; gap:8px; font-size:14px; font-weight:600; color:var(--slate-700);}
+  .structures-head .count{font-size:12px; font-weight:400; color:var(--slate-400); margin-left:4px;}
+  .btn{
+    display:inline-flex; align-items:center; gap:6px; border:none; border-radius:8px; cursor:pointer;
+    font-family:inherit; font-weight:600; transition:.15s;
+  }
+  .btn svg{fill:currentColor;}
+  .btn:disabled{cursor:not-allowed;}
+  .btn-add-structure{
+    font-size:12px; color:var(--blue-700); background:var(--blue-50); border:1px solid var(--blue-200); padding:7px 12px;
+  }
+  .btn-add-structure:hover{background:var(--blue-100);}
+  .btn-add-structure-block{
+    width:100%; justify-content:center; padding:12px; border-radius:12px; border:2px dashed var(--slate-300);
+    background:transparent; color:var(--slate-500); font-size:13px;
+  }
+  .btn-add-structure-block:hover{border-color:var(--blue); color:var(--blue); background:#f0f6ff44;}
+  .btn-generate{
+    padding:10px 20px; border-radius:8px; font-size:14px; background:var(--blue); color:#fff; box-shadow:0 1px 3px rgba(0,0,0,.1);
+  }
+  .btn-generate:hover:not(:disabled){background:var(--blue-dark); box-shadow:0 3px 8px rgba(37,99,235,.3);}
+  .btn-generate:disabled{background:var(--slate-200); color:var(--slate-400);}
+  .btn-download{
+    padding:10px 20px; border-radius:8px; font-size:14px; background:var(--green); color:#fff; box-shadow:0 1px 3px rgba(0,0,0,.1);
+  }
+  .btn-download:hover{background:var(--green-dark); box-shadow:0 3px 8px rgba(22,163,74,.3);}
+  .btn-reset{padding:10px 16px; border-radius:8px; font-size:13px; font-weight:500; color:var(--slate-600); background:#fff; border:1px solid var(--slate-300);}
+  .btn-reset:hover{background:var(--slate-50);}
+
+  .structure-card{background:#fff; border:1px solid var(--slate-200); border-radius:12px; overflow:hidden; box-shadow:0 1px 2px rgba(0,0,0,.04); margin-bottom:16px;}
+  .structure-card-head{display:flex; align-items:center; gap:10px; padding:10px 18px; background:var(--slate-50); border-bottom:1px solid var(--slate-200);}
+  .structure-card-head > svg{width:15px; height:15px; fill:var(--blue); flex-shrink:0;}
+  .structure-name-input{flex:1; font-size:13.5px; font-weight:600; color:var(--slate-800); background:transparent; border:none; outline:none; min-width:0;}
+  .icon-btn{background:none; border:none; cursor:pointer; padding:5px; border-radius:8px; color:var(--slate-400); display:flex; flex-shrink:0;}
+  .icon-btn:hover{color:var(--red); background:var(--red-50);}
+  .icon-btn svg{width:15px; height:15px; fill:currentColor;}
+  .structure-card-body{padding:18px; display:flex; flex-direction:column; gap:16px;}
+
+  .file-field-label{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:6px;}
+  .file-field-label svg{width:14px; height:14px; fill:var(--blue);}
+  .file-field-label span.title{font-size:13px; font-weight:600; color:var(--slate-700);}
+  .file-field-label span.badge{font-size:9px; font-weight:600; background:var(--blue-100); color:var(--blue-700); padding:2px 6px; border-radius:9999px;}
+
+  .dropzone{
+    position:relative; cursor:pointer; border-radius:10px; border:2px dashed var(--slate-300); padding:14px;
+    background:#fff; transition:.15s;
+  }
+  .dropzone:hover{border-color:#93c5fd; background:var(--slate-50);}
+  .dropzone.drag{border-color:var(--blue); background:var(--blue-50);}
+  .dropzone.filled{border-color:#86efac; background:#f0fdf455;}
+  .dz-empty{display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center; padding:4px 0; color:var(--slate-400);}
+  .dz-empty svg{width:26px; height:26px; fill:var(--slate-300);}
+  .dz-empty .t1{font-size:13px; font-weight:500; color:var(--slate-500); margin:0;}
+  .dz-empty .t2{font-size:11px; color:var(--slate-400); margin:2px 0 0;}
+  .dz-filled{display:flex; align-items:flex-start; gap:10px;}
+  .dz-filled > svg{width:18px; height:18px; fill:var(--green); flex-shrink:0; margin-top:2px;}
+  .dz-filled .info{min-width:0; flex:1;}
+  .dz-filled .fname{font-size:13px; font-weight:500; color:var(--slate-800); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .dz-filled .fsize{font-size:11px; color:var(--slate-400); margin:2px 0 0;}
+  .dz-clear{flex-shrink:0; border:none; background:none; border-radius:9999px; padding:4px; cursor:pointer; color:var(--slate-400);}
+  .dz-clear:hover{background:var(--red-50); color:var(--red);}
+  .dz-clear svg{width:13px; height:13px; fill:currentColor;}
+
+  .images-row{display:flex; align-items:center; gap:8px; margin-bottom:8px;}
+  .images-row svg{width:14px; height:14px; fill:var(--blue);}
+  .images-row .title{font-size:13px; font-weight:600; color:var(--slate-700);}
+  .images-row .opt{font-size:11px; color:var(--slate-400); font-weight:400;}
+  .images-grid{display:grid; gap:8px;}
+  .image-slot{display:flex; flex-direction:column; gap:4px;}
+  .image-slot .label{font-size:10.5px; font-weight:600; color:var(--slate-600); text-align:center;}
+  .image-drop{
+    position:relative; height:80px; cursor:pointer; border-radius:10px; border:2px dashed var(--slate-300);
+    background:#fff; overflow:hidden; transition:.15s;
+  }
+  .image-drop:hover{border-color:#93c5fd; background:var(--slate-50);}
+  .image-drop.drag{border-color:var(--blue); background:var(--blue-50);}
+  .image-drop.filled{border-color:#86efac; background:#f0fdf466;}
+  .image-drop img{width:100%; height:100%; object-fit:cover;}
+  .image-drop .placeholder{display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; gap:3px; color:var(--slate-400);}
+  .image-drop .placeholder svg{width:16px; height:16px; fill:var(--slate-400);}
+  .image-drop .placeholder span{font-size:9px;}
+  .image-drop .clear-btn{position:absolute; top:3px; right:3px; background:rgba(239,68,68,.85); border:none; border-radius:9999px; padding:2px; cursor:pointer; box-shadow:0 1px 3px rgba(0,0,0,.3);}
+  .image-drop .clear-btn svg{width:9px; height:9px; fill:#fff; display:block;}
+  .image-drop .caption{position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,.45); padding:1px 4px;}
+  .image-drop .caption span{font-size:8.5px; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block;}
+
+  .gen-row{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:14px;}
+  .gen-row h2{font-size:13.5px; font-weight:600; color:var(--slate-700); margin:0;}
+  .gen-row .hint{font-size:12px; color:var(--slate-400); margin:2px 0 0;}
+  .gen-actions{display:flex; align-items:center; gap:10px;}
+
+  .status-banner{margin-top:14px; display:flex; align-items:flex-start; gap:8px; border-radius:8px; padding:11px 13px;}
+  .status-banner svg{width:15px; height:15px; flex-shrink:0; margin-top:2px;}
+  .status-banner.error{background:var(--red-50); border:1px solid var(--red-200);}
+  .status-banner.error svg{fill:var(--red);}
+  .status-banner.error p{color:var(--red-700); font-size:13px; margin:0;}
+  .status-banner.success{background:var(--green-50); border:1px solid var(--green-200);}
+  .status-banner.success svg{fill:var(--green);}
+  .status-banner.success .t1{font-size:13px; font-weight:500; color:var(--green-700); margin:0;}
+  .status-banner.success .t2{font-size:11.5px; color:var(--green); margin:2px 0 0;}
+
+  .pdf-preview{margin-top:14px; border:1px solid var(--slate-200); border-radius:10px; overflow:hidden; background:var(--slate-50);}
+  .pdf-preview-head{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:9px 13px; border-bottom:1px solid var(--slate-200); background:#fff;}
+  .pdf-preview-head .left{display:flex; align-items:center; gap:7px; font-size:12px; font-weight:600; color:var(--slate-600);}
+  .pdf-preview-head .left svg{width:14px; height:14px; fill:var(--blue);}
+  .pdf-preview-head .fname{font-size:11px; font-weight:400; color:var(--slate-400);}
+  .pdf-preview iframe{width:100%; height:75vh; min-height:520px; border:none; display:block;}
+
+  .ref-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+  @media (max-width:700px){.ref-grid{grid-template-columns:1fr;}}
+  .ref-card{background:#fff; border:1px solid var(--slate-200); border-radius:12px; overflow:hidden;}
+  .ref-card-head{display:flex; align-items:center; gap:8px; padding:10px 14px; background:var(--slate-50); border-bottom:1px solid var(--slate-200);}
+  .ref-card-head svg{width:14px; height:14px; fill:var(--blue);}
+  .ref-card-head span{font-size:11.5px; font-weight:600; color:var(--slate-700);}
+  .ref-card-body{padding:14px; overflow-x:auto;}
+  table.ref-table{width:100%; border-collapse:collapse; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:10.5px; white-space:nowrap;}
+  table.ref-table th{text-align:left; color:var(--slate-400); border-bottom:1px solid var(--slate-200); padding-bottom:4px; padding-right:10px; font-weight:600;}
+  table.ref-table td{padding:2px 10px 2px 0; border-bottom:1px solid var(--slate-100); color:var(--slate-700);}
+  table.ref-table td.code{font-weight:700; color:var(--blue-700);}
+  table.ref-table td.maps{font-size:9px; color:var(--green-700);}
+  table.ref-table tr.total td{font-weight:700; color:var(--slate-800);}
+  .ref-note{font-size:10.5px; color:var(--slate-400); margin:8px 0 0; font-family:inherit; line-height:1.6;}
+
+  input[type=file]{display:none;}
+  .spin{animation:spin 1s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+</style>
+</head>
+<body>
+<header class="app-header">
+  <div class="header-inner">
+    <div class="logo"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM8 18v-2h8v2H8zm0-4v-2h8v2H8zm5-5V3.5L18.5 9H13z"/></svg></div>
+    <div>
+      <h1>Roof Report Generator</h1>
+      <p>Automated PDF inspection reports from Xactimate exports &mdash; runs entirely in your browser</p>
+    </div>
+  </div>
+</header>
+
+<main id="app"></main>
+
+<script>
+// =====================================================================================
+// Constants
+// =====================================================================================
+const IMAGE_SLOTS = [
+  { key: "outline",     label: "Outline",         field: "outlineImage",     slot: "outline" },
+  { key: "measurement", label: "Measurement",      field: "measurementImage", slot: "measurement" },
+  { key: "label",       label: "Label",            field: "labelImage",       slot: "label" },
+  { key: "aerial",      label: "Aerial Photo",     field: "aerialImage",      slot: "aerial" },
+  { key: "annotations", label: "Roof Annotations", field: "annotationsImage", slot: "annotations" },
+];
+
+const ICONS = {
+  spreadsheet: '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM8 15h2v2H8v-2zm0-4h2v2H8v-2zm3 4h5v2h-5v-2zm0-4h5v2h-5v-2z"/></svg>',
+  table: '<svg viewBox="0 0 24 24"><path d="M4 4h16v16H4V4zm2 4v3h5V8H6zm7 0v3h5V8h-5zm-7 5v3h5v-3H6zm7 0v3h5v-3h-5z"/></svg>',
+  upload: '<svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5v2zM11 4l-6 6h4v6h4v-6h4l-6-6z"/></svg>',
+  check: '<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 .001 20.001A10 10 0 0 0 12 2zm-1.2 14.5-4-4 1.4-1.4 2.6 2.6 5.6-5.6 1.4 1.4-7 7z"/></svg>',
+  x: '<svg viewBox="0 0 24 24"><path d="M6.4 5 5 6.4 10.6 12 5 17.6 6.4 19 12 13.4 17.6 19 19 17.6 13.4 12 19 6.4 17.6 5 12 10.6z"/></svg>',
+  building: '<svg viewBox="0 0 24 24"><path d="M4 22V4a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v6h5a1 1 0 0 1 1 1v11h-8v-4H8v4H4zm4-15h2v2H8V7zm4 0h2v2h-2V7zm-4 4h2v2H8v-2zm4 0h2v2h-2v-2zm-4 4h2v2H8v-2zm4 0h2v2h-2v-2zm6-3h2v2h-2v-2zm0 4h2v2h-2v-2z"/></svg>',
+  trash: '<svg viewBox="0 0 24 24"><path d="M6 7h12l-1 14H7L6 7zm3-4h6l1 2h4v2H4V5h4l1-2z"/></svg>',
+  imagePlus: '<svg viewBox="0 0 24 24"><path d="M20 5h-3.2L15 3H9L7.2 5H4a1 1 0 0 0-1 1v13a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1zm-8 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10z"/></svg>',
+  info: '<svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 .001 20.001A10 10 0 0 0 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>',
+  hash: '<svg viewBox="0 0 24 24"><path d="M10 3 9 8H5l1-5h2l-1 5h4l1-5h2l-1 5h4v2h-4.4l-.8 4H20v2h-4.6l-1 5h-2l1-5h-4l-1 5H6l1-5H3v-2h4.4l.8-4H4V8h4.6l1-5h2z"/></svg>',
+  map: '<svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7zm0 9.5A2.5 2.5 0 1 1 12 6a2.5 2.5 0 0 1 0 5.5z"/></svg>',
+  tag: '<svg viewBox="0 0 24 24"><path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.41l9 9c.36.36.86.59 1.41.59s1.05-.23 1.41-.59l7-7c.37-.36.59-.86.59-1.41s-.23-1.05-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/></svg>',
+  eye: '<svg viewBox="0 0 24 24"><path d="M12 5C5 5 1 12 1 12s4 7 11 7 11-7 11-7-4-7-11-7zm0 12a5 5 0 1 1 0-10 5 5 0 0 1 0 10zm0-8a3 3 0 1 0 0 6 3 3 0 0 0 0-6z"/></svg>',
+  plus: '<svg viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z"/></svg>',
+  download: '<svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5v2zm7-16v10.2l3.6-3.6L17 12l-5 5-5-5 1.4-1.4L12 14.2V4h0z"/></svg>',
+  loader: '<svg class="spin" viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 1 10 10h-2a8 8 0 0 0-8-8V2z"/></svg>',
+  alert: '<svg viewBox="0 0 24 24"><path d="M12 2 1 21h22L12 2zm0 5.5 6.9 12H5.1L12 7.5zM11 10h2v5h-2v-5zm0 6h2v2h-2v-2z"/></svg>',
+};
+
+// =====================================================================================
+// State
+// =====================================================================================
+function uuid() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  return "s" + Math.random().toString(36).slice(2) + Date.now();
+}
+
+function makeStructure(index) {
+  return { id: uuid(), name: `Structure ${index + 1}`, variablesFile: null, annotationsFile: null, images: {} };
+}
+
+const state = {
+  orderId: "",
+  claimId: "",
+  address: "",
+  structures: [makeStructure(0)],
+  stage: "idle", // idle | generating | done | error
+  errorMsg: "",
+  pdfBlob: null,
+  pdfName: "",
+  pdfPreviewUrl: null,
+};
+
+function revokePreviewUrl() {
+  if (state.pdfPreviewUrl) {
+    URL.revokeObjectURL(state.pdfPreviewUrl);
+    state.pdfPreviewUrl = null;
+  }
+}
+
+function resetResult() {
+  state.stage = "idle";
+  state.pdfBlob = null;
+  state.errorMsg = "";
+  revokePreviewUrl();
+}
+
+function canGenerate() {
+  return state.structures.some((s) => s.variablesFile || s.annotationsFile);
+}
+
+// =====================================================================================
+// Parsing helpers (ported from the original Xactimate parser)
+// =====================================================================================
+function normalizeKey(raw) {
+  return String(raw).trim().toLowerCase().replace(/[^a-z0-9]/g, "_").replace(/_+/g, "_");
+}
+
+function parseNum(val, fallback) {
+  fallback = fallback === undefined ? 0 : fallback;
+  if (val === null || val === undefined) return fallback;
+  const v = parseFloat(String(val).replace(/,/g, "").trim());
+  return isNaN(v) ? fallback : v;
+}
+
+function pickFirst(map, keys) {
+  for (const k of keys) {
+    const raw = map[k];
+    if (raw === undefined || raw === null) continue;
+    const v = String(raw).trim();
+    if (v !== "") return v;
+  }
+  return "";
+}
+
+// Xactimate exports the pitch "rise" value directly (6.00 = 6/12), not degrees.
+function pitchToLabel(val) {
+  if (val === 0) return "0/12";
+  const rise = Math.round(val * 100) / 100;
+  return `${rise}/12`;
+}
+
+function parseAnnotationsFile(arrayBuffer) {
+  const workbook = XLSX.read(arrayBuffer, { type: "array" });
+  const sheetName = workbook.SheetNames[0];
+  const sheet = workbook.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false });
+
+  if (!rows || rows.length < 2) {
+    return { pitchAreas: [], roofFacets: 0, totalSqFt: 0, totalSquares: 0 };
+  }
+
+  let headerIdx = 0;
+  for (let i = 0; i < Math.min(rows.length, 5); i++) {
+    if (rows[i].filter((c) => String(c).trim() !== "").length >= 3) { headerIdx = i; break; }
+  }
+
+  const headers = rows[headerIdx].map((h) => normalizeKey(h));
+  const findCol = (...cands) => {
+    for (const cand of cands) {
+      const idx = headers.findIndex((h) => h.includes(cand));
+      if (idx !== -1) return idx;
+    }
+    return -1;
+  };
+
+  const faceCol  = findCol("face", "facet", "id", "panel");
+  const sqFtCol  = findCol("sq_ft", "sq_feet", "square_feet", "area", "sqft");
+  const sqsCol   = findCol("_sqs", "sqs", "squares", "num_sq", "no_sq");
+  const pitchCol = findCol("pitch", "slope", "angle");
+
+  const pitchMap = {};
+  let totalSqFt = 0, totalSquares = 0, facetCount = 0, estimatedTotalFound = false;
+
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row || row.every((c) => String(c).trim() === "")) continue;
+
+    const faceVal = faceCol !== -1 ? String(row[faceCol] ?? "").trim() : "";
+    const lower = faceVal.toLowerCase();
+    const isTotalRow = lower.includes("total") || lower.includes("estimated") || lower.includes("sum");
+
+    const sqFt = sqFtCol !== -1 ? parseNum(row[sqFtCol]) : 0;
+    const sqs = sqsCol !== -1 ? parseNum(row[sqsCol]) : 0;
+    const pitchRaw = pitchCol !== -1 ? parseNum(row[pitchCol]) : 0;
+
+    if (isTotalRow) {
+      if (sqFt > 0) totalSqFt = sqFt;
+      if (sqs > 0) totalSquares = sqs;
+      estimatedTotalFound = true;
+      continue;
+    }
+
+    if (sqFt === 0) continue;
+
+    facetCount++;
+    const pitchLabel = pitchToLabel(pitchRaw);
+    pitchMap[pitchLabel] = (pitchMap[pitchLabel] ?? 0) + sqFt;
+  }
+
+  if (!estimatedTotalFound || totalSqFt === 0) {
+    totalSqFt = Object.values(pitchMap).reduce((s, v) => s + v, 0);
+  }
+  if (totalSquares === 0 && totalSqFt > 0) {
+    totalSquares = Math.round((totalSqFt / 100) * 100) / 100;
+  }
+
+  const pitchAreas = Object.entries(pitchMap)
+    .map(([pitch, area]) => ({ pitch, area: Math.round(area * 100) / 100 }))
+    .sort((a, b) => b.area - a.area);
+
+  return { pitchAreas, roofFacets: facetCount, totalSqFt, totalSquares };
+}
+
+function parseVariablesFile(arrayBuffer) {
+  const workbook = XLSX.read(arrayBuffer, { type: "array" });
+  const sheetName = workbook.SheetNames[0];
+  const sheet = workbook.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false });
+
+  const byCode = {}, byDesc = {};
+
+  for (const row of rows) {
+    if (!Array.isArray(row) || row.length < 3) continue;
+    const code = String(row[0] ?? "").trim().toUpperCase();
+    const desc = normalizeKey(String(row[1] ?? ""));
+    const val = parseNum(String(row[2] ?? ""));
+    if (code !== "" && !isNaN(val)) byCode[code] = val;
+    if (desc !== "" && !isNaN(val) && !(desc in byDesc)) byDesc[desc] = val;
+  }
+
+  const code = (...codes) => {
+    for (const c of codes) {
+      const upper = c.toUpperCase();
+      if (upper in byCode && byCode[upper] > 0) return byCode[upper];
+      const withSuffix = upper + "0";
+      if (withSuffix in byCode && byCode[withSuffix] > 0) return byCode[withSuffix];
+    }
+    return 0;
+  };
+
+  const desc = (...keys) => parseNum(pickFirst(byDesc, keys));
+
+  const squareFeet = code("RSF") || desc("total_roof_area", "total_area", "rsf");
+  const squares = code("RSQ") || desc("total_roof_sq", "total_squares", "rsq")
+    || (squareFeet > 0 ? Math.round((squareFeet / 100) * 100) / 100 : 0);
+  const perimeter = code("P") || desc("total_roof_perimeter", "total_perimeter", "perimeter");
+  const ridge = code("R") || desc("total_ridge_length", "ridge");
+  const hip = code("HIP") || desc("total_hip_length", "hip");
+  const eave = code("EAVE") || desc("total_eave_edge_length", "eave");
+  const rake = code("RAKE") || desc("total_rake_edge_length", "rake");
+  const valley = code("VAL") || desc("total_valley_length", "valley");
+  const stepFlash = code("STEPFLASH", "STEPFLA") || desc("total_stepflash_length", "step_flash");
+  const flash = code("FLASH") || desc("total_flash_length", "flash");
+  const apronFlash = flash > stepFlash && stepFlash > 0
+    ? Math.round((flash - stepFlash) * 100) / 100
+    : (flash > 0 && stepFlash === 0 ? flash : 0);
+  const dripEdge = eave + rake;
+
+  return { squareFeet, squares, perimeter, ridge, hip, eave, rake, valley, stepFlashing: stepFlash, apronFlashing: apronFlash, dripEdge };
+}
+
+// PDF filename: Claim ID takes priority; otherwise fall back to the street portion of
+// the address (everything before the first comma); otherwise fall back to Order ID.
+function extractStreet(address) {
+  if (!address) return "";
+  return address.split(",")[0].trim();
+}
+
+// Strip only characters that are actually invalid in filenames (across Windows/macOS/Linux),
+// while preserving spaces and normal punctuation so names like "115 W Aurora Vista Trail"
+// come through unchanged.
+function sanitizeForFilename(str) {
+  return str.replace(/[\\/:*?"<>|]+/g, "").replace(/\s+/g, " ").trim();
+}
+
+function buildFilenameBase() {
+  const claimId = state.claimId.trim();
+  if (claimId) return sanitizeForFilename(claimId);
+
+  const street = extractStreet(state.address);
+  if (street) return sanitizeForFilename(street);
+
+  const orderId = state.orderId.trim();
+  if (orderId) return sanitizeForFilename(orderId);
+
+  return "Report";
+}
+
+function calcWasteFactors(squares) {
+  const r = (v) => Math.round(v * 100) / 100;
+  return { waste10: r(squares * 1.10), waste15: r(squares * 1.15), waste18: r(squares * 1.18), waste20: r(squares * 1.20) };
+}
+
+// Xactimate exports individually-rounded facet areas whose sum can differ from the
+// export's own "Estimated Total" by a cent or two (their internal calc uses more
+// precision than the displayed per-facet values). Rather than let our own tables show
+// two slightly different totals, nudge the largest pitch bucket by the rounding delta
+// so the pitch breakdown always sums exactly to the authoritative total used everywhere
+// else in the report (Total Area Summary table, and Xactimate's own Estimated Total).
+function reconcilePitchAreas(pitchAreas, authoritativeTotal) {
+  if (!pitchAreas.length) return pitchAreas;
+  const sum = pitchAreas.reduce((s, p) => s + p.area, 0);
+  const delta = Math.round((authoritativeTotal - sum) * 100) / 100;
+  if (delta === 0) return pitchAreas;
+
+  let largestIdx = 0;
+  for (let i = 1; i < pitchAreas.length; i++) {
+    if (pitchAreas[i].area > pitchAreas[largestIdx].area) largestIdx = i;
+  }
+  return pitchAreas.map((p, i) =>
+    i === largestIdx ? { ...p, area: Math.round((p.area + delta) * 100) / 100 } : p
+  );
+}
+
+function emptyVars() {
+  return { squareFeet: 0, squares: 0, perimeter: 0, ridge: 0, hip: 0, eave: 0, rake: 0, valley: 0, stepFlashing: 0, apronFlashing: 0, dripEdge: 0 };
+}
+function emptyAnnots() {
+  return { pitchAreas: [], roofFacets: 0, totalSqFt: 0, totalSquares: 0 };
+}
+
+// =====================================================================================
+// Image loading (File -> embeddable image data with natural dimensions)
+// =====================================================================================
+function fileToImageData(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      const img = new Image();
+      img.onload = () => {
+        const nw = img.naturalWidth, nh = img.naturalHeight;
+        if (!nw || !nh) { reject(new Error(`"${file.name}" has invalid image dimensions and could not be used.`)); return; }
+        let format = "JPEG";
+        if (file.type.includes("png")) format = "PNG";
+        else if (file.type.includes("webp")) format = "WEBP";
+        let finalDataUrl = dataUrl;
+        // Re-encode anything jsPDF may not embed directly (e.g. GIF) via canvas -> PNG.
+        if (file.type.includes("gif") || !/^image\/(jpe?g|png|webp)$/.test(file.type)) {
+          try {
+            const canvas = document.createElement("canvas");
+            canvas.width = nw; canvas.height = nh;
+            canvas.getContext("2d").drawImage(img, 0, 0);
+            finalDataUrl = canvas.toDataURL("image/png");
+            format = "PNG";
+          } catch (e) {
+            reject(new Error(`Could not process image "${file.name}": ${e.message}`));
+            return;
+          }
+        }
+        resolve({ dataUrl: finalDataUrl, width: nw, height: nh, format });
+      };
+      img.onerror = () => reject(new Error(`"${file.name}" could not be read as an image.`));
+      img.src = dataUrl;
+    };
+    reader.onerror = () => reject(new Error(`Could not read file "${file.name}".`));
+    reader.readAsDataURL(file);
+  });
+}
+
+function readArrayBuffer(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error(`Could not read file "${file.name}".`));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// =====================================================================================
+// PDF generation (ported from the pdfkit server renderer to jsPDF, client-side)
+// =====================================================================================
+function drawBorder(doc) {
+  const M = 20;
+  doc.setDrawColor(0, 0, 0);
+  doc.setLineWidth(1.5);
+  doc.rect(M, M, 612 - M * 2, 792 - M * 2);
+}
+
+function drawText(doc, str, x, yTop, w, align, size, bold) {
+  doc.setFont("helvetica", bold ? "bold" : "normal");
+  doc.setFontSize(size);
+  doc.setTextColor(0, 0, 0);
+  const tx = align === "center" ? x + w / 2 : x;
+  doc.text(str, tx, yTop + size, { align, maxWidth: w });
+  return yTop + size * 1.3;
+}
+
+function placeImage(doc, imgData, x, y, w, h) {
+  if (h <= 0) return;
+  if (!imgData) {
+    doc.setDrawColor(204, 204, 204);
+    doc.setLineWidth(0.5);
+    doc.rect(x, y, w, h);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(170, 170, 170);
+    doc.text("[No image uploaded]", x + w / 2, y + h / 2 + 3, { align: "center" });
+    doc.setTextColor(0, 0, 0);
+    return;
+  }
+  try {
+    const { dataUrl, width: nw, height: nh, format } = imgData;
+    if (!nw || !nh) throw new Error("invalid dimensions");
+    const scale = Math.min(w / nw, h / nh);
+    const dw = nw * scale, dh = nh * scale;
+    const dx = x + (w - dw) / 2, dy = y + (h - dh) / 2;
+    doc.addImage(dataUrl, format, dx, dy, dw, dh);
+  } catch (e) {
+    doc.setDrawColor(204, 204, 204);
+    doc.setLineWidth(0.5);
+    doc.rect(x, y, w, h);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(120, 120, 120);
+    doc.text("[Image could not be embedded]", x + w / 2, y + h / 2 + 3, { align: "center" });
+    doc.setTextColor(0, 0, 0);
+  }
+}
+
+function drawTable(doc, x, y, w, headers, rows, colFracs, rowH) {
+  rowH = rowH || 20;
+  const cols = colFracs.length;
+  const colXs = colFracs.map((_, i) => x + colFracs.slice(0, i).reduce((s, f) => s + f * w, 0));
+  const colWs = colFracs.map((f) => f * w);
+  const totalH = rowH * (1 + rows.length);
+  const fs = 10;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(fs);
+  doc.setTextColor(17, 17, 17);
+  headers.forEach((h, i) => {
+    doc.text(String(h), colXs[i] + colWs[i] / 2, y + rowH / 2 + fs * 0.35, { align: "center", maxWidth: colWs[i] - 10 });
+  });
+
+  rows.forEach((row, ri) => {
+    const ry = y + rowH * (ri + 1);
+    const isLastRow = ri === rows.length - 1 && row[0] === "Total";
+    doc.setFont("helvetica", isLastRow ? "bold" : "normal");
+    doc.setFontSize(fs);
+    doc.setTextColor(isLastRow ? 17 : 0, isLastRow ? 17 : 0, isLastRow ? 17 : 0);
+    row.forEach((cell, ci) => {
+      doc.text(String(cell), colXs[ci] + colWs[ci] / 2, ry + rowH / 2 + fs * 0.35, { align: "center", maxWidth: colWs[ci] - 10 });
+    });
+  });
+
+  doc.setDrawColor(153, 153, 153);
+  doc.setLineWidth(0.5);
+  doc.rect(x, y, w, totalH);
+  for (let i = 1; i <= rows.length; i++) {
+    const ly = y + rowH * i;
+    doc.line(x, ly, x + w, ly);
+  }
+  for (let ci = 1; ci < cols; ci++) {
+    doc.line(colXs[ci], y, colXs[ci], y + totalH);
+  }
+  doc.setTextColor(0, 0, 0);
+
+  return y + totalH;
+}
+
+// When a structure has many distinct pitches, the "Roof Area Summary" table can grow
+// taller than the remaining space on the page. Rather than letting it run off the page,
+// split it into 2 (or, if still too tall, 3) side-by-side mini-tables that continue the
+// same list top-to-bottom, left-column-then-right-column, with the grand Total as the
+// very last row of the last column.
+function computePitchColumns(pitchAreas, authoritativeTotal, availH, availW, rowH) {
+  const rows = pitchAreas.map((pa) => [pa.pitch, pa.area.toFixed(2)]);
+  rows.push(["Total", authoritativeTotal.toFixed(2)]);
+
+  const gap = 12;
+  const minColWidth = 130; // keep each mini-table's columns legible
+  const maxColsByWidth = Math.max(1, Math.floor((availW + gap) / (minColWidth + gap)));
+
+  let cols = 1;
+  for (let k = 1; k <= maxColsByWidth; k++) {
+    const rowsPerCol = Math.ceil(rows.length / k);
+    const neededH = rowH * (1 + rowsPerCol); // +1 for the header row
+    if (neededH <= availH || k === maxColsByWidth) { cols = k; break; }
+  }
+
+  const rowsPerCol = Math.ceil(rows.length / cols);
+  const columns = [];
+  for (let i = 0; i < cols; i++) {
+    const slice = rows.slice(i * rowsPerCol, (i + 1) * rowsPerCol);
+    if (slice.length) columns.push(slice);
+  }
+  return columns;
+}
+
+function drawPitchAreaTables(doc, CL, y, CW, availH, pitchAreas, authoritativeTotal, rowH) {
+  const columns = computePitchColumns(pitchAreas, authoritativeTotal, availH, CW, rowH);
+  const gap = 12;
+  const n = columns.length;
+  const colW = (CW - gap * (n - 1)) / n;
+  let maxBottom = y;
+  columns.forEach((rowsForCol, i) => {
+    const x = CL + i * (colW + gap);
+    const bottom = drawTable(doc, x, y, colW, ["Pitch", "Area (sq.ft)"], rowsForCol, [0.65, 0.35], rowH);
+    maxBottom = Math.max(maxBottom, bottom);
+  });
+  return maxBottom;
+}
+
+function renderStructure(doc, structure, isFirst, CL, CT, CW, CH, CB, newPage) {
+  const { data, slots } = structure;
+
+  if (isFirst) {
+    newPage();
+    const p1TextH = 78;
+    const p1ImgH = CH - p1TextH - 6;
+    placeImage(doc, slots.aerial, CL, CT, CW, p1ImgH);
+    let p1TextY = CT + p1ImgH + 14;
+    p1TextY = drawText(doc, `Order ID \u2013 ${data.orderId}`, CL, p1TextY, CW, "center", 13, true);
+    drawText(doc, `Address \u2013 ${data.address}`, CL, p1TextY + 5, CW, "center", 10, false);
+  }
+
+  // Page: Label + Annotations images
+  newPage();
+  const p2Half = Math.floor((CH - 12) / 2);
+  placeImage(doc, slots.label, CL, CT, CW, p2Half);
+  placeImage(doc, slots.annotations, CL, CT + p2Half + 12, CW, CB - (CT + p2Half + 12));
+
+  // Page: Measurement image + metrics tables
+  newPage();
+  const p3ImgH = Math.round(CH * 0.52);
+  placeImage(doc, slots.measurement, CL, CT, CW, p3ImgH);
+
+  let p3Y = CT + p3ImgH + 26;
+  p3Y = drawText(doc, "Roof Metrics", CL, p3Y, CW, "center", 10, true) + 5;
+  p3Y = drawTable(doc, CL, p3Y, CW,
+    ["Square Feet", "Squares", "Perimeter (ft)", "Ridge (ft)", "Hip (ft)"],
+    [[data.squareFeet.toFixed(2), data.squares.toFixed(2), data.perimeter.toFixed(2), data.ridge.toFixed(2), data.hip.toFixed(2)]],
+    [0.2, 0.2, 0.2, 0.2, 0.2], 28);
+
+  p3Y += 14;
+  p3Y = drawText(doc, "Waste Factors", CL, p3Y, CW, "center", 10, true) + 5;
+  drawTable(doc, CL, p3Y, CW,
+    ["10% Waste (sq)", "15% Waste (sq)", "18% Waste (sq)", "20% Waste (sq)"],
+    [[data.waste10.toFixed(2), data.waste15.toFixed(2), data.waste18.toFixed(2), data.waste20.toFixed(2)]],
+    [0.25, 0.25, 0.25, 0.25], 28);
+
+  // Page: Summary tables
+  newPage();
+  let p4Y = CT;
+  p4Y = drawText(doc, "Total Area Summary", CL, p4Y, CW, "center", 10, true) + 5;
+  p4Y = drawTable(doc, CL, p4Y, CW,
+    ["Description", "Value"],
+    [["Roof Facets", String(data.roofFacets)], ["Area (sq.ft)", data.squareFeet.toFixed(2)], ["Squares", data.squares.toFixed(2)]],
+    [0.65, 0.35], 26);
+
+  p4Y += 16;
+  p4Y = drawText(doc, "Edge Length Summary", CL, p4Y, CW, "center", 10, true) + 5;
+  p4Y = drawTable(doc, CL, p4Y, CW,
+    ["Edge Type", "Length (Ft.)"],
+    [
+      ["Eave", data.eave.toFixed(2)], ["Rake", data.rake.toFixed(2)],
+      ["Hip", data.hip.toFixed(2)], ["Valley", data.valley.toFixed(2)],
+      ["Ridge", data.ridge.toFixed(2)], ["Step Flashing", data.stepFlashing.toFixed(2)],
+      ["Apron Flashing", data.apronFlashing.toFixed(2)], ["Drip Edge", data.dripEdge.toFixed(2)],
+    ],
+    [0.65, 0.35], 26);
+
+  if (data.pitchAreas.length > 0) {
+    p4Y += 16;
+    p4Y = drawText(doc, "Roof Area Summary", CL, p4Y, CW, "center", 10, true) + 5;
+    const availH = Math.max(26 * 2, CB - p4Y);
+    drawPitchAreaTables(doc, CL, p4Y, CW, availH, data.pitchAreas, data.squareFeet, 26);
+  }
+
+  // Page: Outline image
+  newPage();
+  placeImage(doc, slots.outline, CL, CT, CW, CH);
+}
+
+function generatePDF(structures) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: "pt", format: "letter" });
+  let pageCount = 0;
+  const newPage = () => {
+    if (pageCount > 0) doc.addPage("letter", "portrait");
+    pageCount++;
+    drawBorder(doc);
+  };
+
+  const BM = 20, PAD = 10;
+  const CL = BM + PAD, CT = BM + PAD, CW = 612 - (BM + PAD) * 2, CH = 792 - (BM + PAD) * 2, CB = CT + CH;
+
+  structures.forEach((structure, i) => {
+    renderStructure(doc, structure, i === 0, CL, CT, CW, CH, CB, newPage);
+  });
+
+  return doc;
+}
+
+const FIELD_TO_SLOT = { outlineImage: "outline", measurementImage: "measurement", labelImage: "label", aerialImage: "aerial", annotationsImage: "annotations" };
+
+async function generate() {
+  if (!canGenerate() || state.stage === "generating") return;
+  state.stage = "generating";
+  state.errorMsg = "";
+  state.pdfBlob = null;
+  revokePreviewUrl();
+  render();
+
+  try {
+    const structuresData = [];
+
+    for (const s of state.structures) {
+      if (!s.variablesFile && !s.annotationsFile) continue;
+
+      let vars = emptyVars(), annots = emptyAnnots();
+
+      if (s.variablesFile) {
+        try {
+          const buf = await readArrayBuffer(s.variablesFile);
+          vars = parseVariablesFile(buf);
+        } catch (e) {
+          throw new Error(`"${s.name}": couldn't read Variables Excel (${s.variablesFile.name}) — ${e.message}`);
+        }
+      }
+      if (s.annotationsFile) {
+        try {
+          const buf = await readArrayBuffer(s.annotationsFile);
+          annots = parseAnnotationsFile(buf);
+        } catch (e) {
+          throw new Error(`"${s.name}": couldn't read Annotations CSV (${s.annotationsFile.name}) — ${e.message}`);
+        }
+      }
+
+      const squareFeet = vars.squareFeet > 0 ? vars.squareFeet : annots.totalSqFt;
+      const squares = vars.squares > 0 ? vars.squares
+        : (annots.totalSquares > 0 ? annots.totalSquares : Math.round((squareFeet / 100) * 100) / 100);
+      const waste = calcWasteFactors(squares);
+      const pitchAreas = reconcilePitchAreas(annots.pitchAreas, squareFeet);
+
+      const data = {
+        orderId: state.orderId.trim() || "N/A",
+        address: state.address.trim() || "N/A",
+        squareFeet, squares,
+        perimeter: vars.perimeter, ridge: vars.ridge, hip: vars.hip,
+        waste10: waste.waste10, waste15: waste.waste15, waste18: waste.waste18, waste20: waste.waste20,
+        roofFacets: annots.roofFacets > 0 ? annots.roofFacets : 1,
+        eave: vars.eave, rake: vars.rake, valley: vars.valley,
+        stepFlashing: vars.stepFlashing, apronFlashing: vars.apronFlashing, dripEdge: vars.dripEdge,
+        pitchAreas,
+      };
+
+      const slots = {};
+      for (const { field } of IMAGE_SLOTS) {
+        const img = s.images[field];
+        if (img) {
+          try {
+            slots[FIELD_TO_SLOT[field]] = await fileToImageData(img.file);
+          } catch (e) {
+            throw new Error(`"${s.name}": ${e.message}`);
+          }
+        }
+      }
+
+      structuresData.push({ name: s.name, data, slots });
+    }
+
+    if (structuresData.length === 0) {
+      throw new Error("Please upload at least a Variables Excel or Annotations CSV file in one of the structures.");
+    }
+
+    const doc = generatePDF(structuresData);
+    const filename = `${buildFilenameBase()}_Full Report.pdf`;
+
+    state.pdfBlob = doc.output("blob");
+    state.pdfName = filename;
+    state.pdfPreviewUrl = URL.createObjectURL(state.pdfBlob);
+    state.stage = "done";
+  } catch (err) {
+    console.error("Report generation failed:", err);
+    state.errorMsg = (err && err.message) ? err.message : "Something went wrong while generating the report.";
+    state.stage = "error";
+  }
+  render();
+}
+
+function downloadPdf() {
+  if (!state.pdfBlob) return;
+  const url = URL.createObjectURL(state.pdfBlob);
+  const a = document.createElement("a");
+  a.href = url; a.download = state.pdfName; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function resetAll() {
+  state.structures.forEach((s) => Object.values(s.images).forEach((img) => img && URL.revokeObjectURL(img.preview)));
+  state.orderId = ""; state.claimId = ""; state.address = "";
+  state.structures = [makeStructure(0)];
+  state.stage = "idle"; state.pdfBlob = null; state.errorMsg = "";
+  revokePreviewUrl();
+  render();
+}
+
+// =====================================================================================
+// Rendering (vanilla-JS "component" functions -> HTML strings)
+// =====================================================================================
+function esc(s) {
+  const d = document.createElement("div");
+  d.textContent = s == null ? "" : s;
+  return d.innerHTML;
+}
+
+function fmtKB(bytes) { return (bytes / 1024).toFixed(1) + " KB"; }
+
+function renderStructureCard(s, index, showRemove, isFirst) {
+  const slotsForCard = IMAGE_SLOTS.filter(({ field }) => isFirst || field !== "aerialImage");
+  const gridCols = isFirst ? 5 : 4;
+
+  const imageSlotsHtml = slotsForCard.map(({ label, field }) => {
+    const img = s.images[field];
+    return `
+      <div class="image-slot">
+        <p class="label">${esc(label)}</p>
+        <div class="image-drop ${img ? "filled" : ""}" data-role="image-drop" data-sid="${s.id}" data-field="${field}">
+          ${img ? `
+            <img src="${img.preview}" alt="${esc(label)}" />
+            <button class="clear-btn" data-role="clear-image" data-sid="${s.id}" data-field="${field}">${ICONS.x}</button>
+            <div class="caption"><span>${esc(img.file.name)}</span></div>
+          ` : `
+            <div class="placeholder">${ICONS.upload}<span>Drop or click</span></div>
+          `}
+        </div>
+      </div>`;
+  }).join("");
+
+  return `
+    <div class="structure-card" data-sid="${s.id}">
+      <div class="structure-card-head">
+        ${ICONS.building}
+        <input type="text" class="structure-name-input" data-role="structure-name" data-sid="${s.id}"
+               value="${esc(s.name)}" placeholder="Structure ${index + 1}" />
+        ${showRemove ? `<button class="icon-btn" data-role="remove-structure" data-sid="${s.id}">${ICONS.trash}</button>` : ""}
+      </div>
+      <div class="structure-card-body">
+        <div class="grid-2">
+          <div>
+            <div class="file-field-label">
+              ${ICONS.spreadsheet}<span class="title">Variables Excel</span>
+              <span class="badge">Col A=code &middot; Col C=value</span>
+            </div>
+            <div class="dropzone ${s.variablesFile ? "filled" : ""}" data-role="dropzone" data-kind="variables" data-sid="${s.id}">
+              ${s.variablesFile ? `
+                <div class="dz-filled">
+                  ${ICONS.check}
+                  <div class="info">
+                    <p class="fname">${esc(s.variablesFile.name)}</p>
+                    <p class="fsize">${fmtKB(s.variablesFile.size)}</p>
+                  </div>
+                  <button class="dz-clear" data-role="clear-file" data-kind="variables" data-sid="${s.id}">${ICONS.x}</button>
+                </div>
+              ` : `
+                <div class="dz-empty">${ICONS.upload}<p class="t1">Drop here or click to browse</p><p class="t2">Xactimate .xlsx export</p></div>
+              `}
+              <input type="file" accept=".xlsx,.xls" data-role="file-input" data-kind="variables" data-sid="${s.id}" />
+            </div>
+          </div>
+          <div>
+            <div class="file-field-label">
+              ${ICONS.table}<span class="title">Annotations CSV</span>
+              <span class="badge">Document &middot; Level &middot; FACE &middot; SQ FT &middot; Pitch</span>
+            </div>
+            <div class="dropzone ${s.annotationsFile ? "filled" : ""}" data-role="dropzone" data-kind="annotations" data-sid="${s.id}">
+              ${s.annotationsFile ? `
+                <div class="dz-filled">
+                  ${ICONS.check}
+                  <div class="info">
+                    <p class="fname">${esc(s.annotationsFile.name)}</p>
+                    <p class="fsize">${fmtKB(s.annotationsFile.size)}</p>
+                  </div>
+                  <button class="dz-clear" data-role="clear-file" data-kind="annotations" data-sid="${s.id}">${ICONS.x}</button>
+                </div>
+              ` : `
+                <div class="dz-empty">${ICONS.upload}<p class="t1">Drop here or click to browse</p><p class="t2">Xactimate .csv export</p></div>
+              `}
+              <input type="file" accept=".csv,.xlsx,.xls" data-role="file-input" data-kind="annotations" data-sid="${s.id}" />
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="images-row">${ICONS.imagePlus}<span class="title">Roof Images</span><span class="opt">(optional)</span></div>
+          <div class="images-grid" style="grid-template-columns: repeat(${gridCols}, 1fr);">
+            ${imageSlotsHtml}
+          </div>
+          <input type="file" accept="image/*" data-role="image-input" data-sid="${s.id}" style="display:none" />
+        </div>
+      </div>
+    </div>`;
+}
+
+function render() {
+  const app = document.getElementById("app");
+  const structCount = state.structures.length;
+  const pages = 5 + (structCount - 1) * 4;
+  const canGen = canGenerate();
+
+  app.innerHTML = `
+    <div class="info-banner">
+      ${ICONS.info}
+      <p><span style="font-weight:600;">Auto from your files:</span>
+      Waste factors (10%/15%/18%/20%) computed from RSQ &middot; Facets counted from FACE rows &middot;
+      Pitch breakdown grouped from annotations &middot; RSF/RSQ/P/R/RAKE/HIP/EAVE/VAL/FLASH/STEPFLASH read from Variables Excel.</p>
+    </div>
+
+    <div class="card card-pad">
+      <p style="font-size:13px;font-weight:600;color:var(--slate-700);margin:0 0 14px;">Report Details</p>
+      <div class="grid-3">
+        <div>
+          <label class="field-label">${ICONS.hash}Order ID</label>
+          <input type="text" id="orderIdInput" value="${esc(state.orderId)}" placeholder="e.g. P397155079" />
+        </div>
+        <div>
+          <label class="field-label">${ICONS.tag}Claim ID <span style="font-weight:400;color:var(--slate-400);">(optional)</span></label>
+          <input type="text" id="claimIdInput" value="${esc(state.claimId)}" placeholder="e.g. CLM-20481" />
+        </div>
+        <div>
+          <label class="field-label">${ICONS.map}Property Address</label>
+          <input type="text" id="addressInput" value="${esc(state.address)}" placeholder="e.g. 301 Ellsworth Drive, Silver Spring MD 20910" />
+        </div>
+      </div>
+      <p style="font-size:11px;color:var(--slate-400);margin:10px 0 0;">
+        PDF file name: Claim ID if filled in (e.g. "CLM-20481_Full Report.pdf") &mdash;
+        otherwise the street from the address (e.g. "115 W Aurora Vista Trail_Full Report.pdf").
+      </p>
+    </div>
+
+    <div>
+      <div class="structures-head">
+        <div class="left">
+          ${ICONS.building}Structures
+          <span class="count">(${structCount} ${structCount === 1 ? "structure" : "structures"} &mdash; ${pages} pages in PDF)</span>
+        </div>
+        <button class="btn btn-add-structure" id="addStructureTop">${ICONS.plus}Add Structure</button>
+      </div>
+
+      <div id="structuresList" style="margin-top:14px;">
+        ${state.structures.map((s, i) => renderStructureCard(s, i, structCount > 1, i === 0)).join("")}
+      </div>
+
+      <button class="btn btn-add-structure-block" id="addStructureBottom">${ICONS.plus}Add Structure</button>
+    </div>
+
+    <div class="card card-pad">
+      <div class="gen-row">
+        <div>
+          <h2>Generate &amp; Preview Report</h2>
+          <p class="hint">
+            ${!canGen ? "Upload at least one data file in any structure to continue"
+              : state.stage === "done" ? `Preview ready below &mdash; recheck it, then download: ${esc(state.pdfName)}`
+              : `${structCount} structure${structCount > 1 ? "s" : ""} &mdash; ${pages} pages &mdash; click Preview to build and review your PDF`}
+          </p>
+        </div>
+        <div class="gen-actions">
+          ${state.stage === "done" ? `<button class="btn btn-reset" id="resetBtn">Start Over</button>` : ""}
+          ${state.stage !== "done" ? `
+            <button class="btn btn-generate" id="generateBtn" ${!canGen || state.stage === "generating" ? "disabled" : ""}>
+              ${state.stage === "generating" ? `${ICONS.loader}Generating...` : `${ICONS.eye}Preview Report`}
+            </button>
+          ` : `
+            <button class="btn btn-generate" id="regenerateBtn">${ICONS.eye}Re-preview</button>
+            <button class="btn btn-download" id="downloadBtn">${ICONS.download}Download PDF</button>
+          `}
+        </div>
+      </div>
+
+      ${state.stage === "error" ? `
+        <div class="status-banner error">${ICONS.alert}<p>${esc(state.errorMsg)}</p></div>
+      ` : ""}
+      ${state.stage === "done" ? `
+        <div class="status-banner success">
+          ${ICONS.check}
+          <div>
+            <p class="t1">Report generated &mdash; recheck it in the preview below before downloading</p>
+            <p class="t2">${structCount} structure${structCount > 1 ? "s" : ""} &middot; ${pages} pages &middot; Waste factors auto-calculated</p>
+          </div>
+        </div>
+        <div class="pdf-preview">
+          <div class="pdf-preview-head">
+            <div class="left">${ICONS.eye}Preview</div>
+            <span class="fname">${esc(state.pdfName)}</span>
+          </div>
+          <iframe src="${state.pdfPreviewUrl}" title="Report preview"></iframe>
+        </div>
+      ` : ""}
+    </div>
+
+    <div class="ref-grid">
+      <div class="ref-card">
+        <div class="ref-card-head">${ICONS.spreadsheet}<span>Variables Excel &mdash; Xactimate codes used</span></div>
+        <div class="ref-card-body">
+          <table class="ref-table">
+            <thead><tr><th>Col A (Code)</th><th>Col B (Description)</th><th>Col C (Value)</th></tr></thead>
+            <tbody>
+              ${[
+                ["RSF","Total roof area","2363","→ Square Feet"],
+                ["RSQ","Total roof sq","23.63","→ Squares"],
+                ["P","Total roof perimeter","309.1","→ Perimeter + Drip Edge"],
+                ["R","Total ridge length","50.08","→ Ridge"],
+                ["HIP","Total hip length","37.87","→ Hip"],
+                ["EAVE","Total eave edge length","234.3","→ Eave"],
+                ["RAKE","Total rake edge length","74.81","→ Rake"],
+                ["VAL","Total valley length","29.75","→ Valley"],
+                ["STEPFLASH","Total stepflash length","56.74","→ Step Flashing"],
+                ["FLASH","Total flash length","38.42","→ Apron Flashing"],
+              ].map(([code, d, val, maps]) => `
+                <tr><td class="code">${code}</td><td style="color:var(--slate-500);font-size:10px;">${d}</td><td>${val}</td><td class="maps">${maps}</td></tr>
+              `).join("")}
+            </tbody>
+          </table>
+          <p class="ref-note">Codes with a <code>0</code> suffix (e.g. <code>EAVE0</code>) are also recognized.</p>
+        </div>
+      </div>
+
+      <div class="ref-card">
+        <div class="ref-card-head">${ICONS.table}<span>Annotations CSV &mdash; Xactimate export</span></div>
+        <div class="ref-card-body">
+          <table class="ref-table">
+            <thead><tr>${["Document","Level","FACE","SQ FT","# SQs","Pitch - Degrees"].map(h=>`<th>${h}</th>`).join("")}</tr></thead>
+            <tbody>
+              ${[
+                ["SKETCH1","Main Level","F1","279.51","2.80","6.00"],
+                ["SKETCH1","Main Level","F2","350.61","3.51","6.00"],
+                ["SKETCH1","Main Level","F3","174.69","1.75","6.00"],
+                ["SKETCH1","Main Level","F18","0.00","0.00","6.00"],
+                ["…","…","…","…","…","…"],
+                ["SKETCH1","Main Level","Estimated Total:","2362.59","23.63",""],
+              ].map((row) => `<tr class="${row[2]==="Estimated Total:" ? "total" : ""}">${row.map(c=>`<td>${c}</td>`).join("")}</tr>`).join("")}
+            </tbody>
+          </table>
+          <p class="ref-note"><code>Pitch - Degrees</code> column contains the rise value (e.g. 6.00 = 6/12 pitch). The <code>Estimated Total</code> row is used for area totals.</p>
+        </div>
+      </div>
+    </div>
+  `;
+
+  wireEvents();
+}
+
+// =====================================================================================
+// Event wiring
+// =====================================================================================
+function findStructure(id) { return state.structures.find((s) => s.id === id); }
+
+function wireEvents() {
+  const orderIdInput = document.getElementById("orderIdInput");
+  orderIdInput.addEventListener("input", (e) => { state.orderId = e.target.value; resetResultSilently(); });
+  const claimIdInput = document.getElementById("claimIdInput");
+  claimIdInput.addEventListener("input", (e) => { state.claimId = e.target.value; resetResultSilently(); });
+  const addressInput = document.getElementById("addressInput");
+  addressInput.addEventListener("input", (e) => { state.address = e.target.value; resetResultSilently(); });
+
+  document.getElementById("addStructureTop").addEventListener("click", addStructure);
+  document.getElementById("addStructureBottom").addEventListener("click", addStructure);
+
+  const genBtn = document.getElementById("generateBtn");
+  if (genBtn) genBtn.addEventListener("click", generate);
+  const regenBtn = document.getElementById("regenerateBtn");
+  if (regenBtn) regenBtn.addEventListener("click", generate);
+  const dlBtn = document.getElementById("downloadBtn");
+  if (dlBtn) dlBtn.addEventListener("click", downloadPdf);
+  const resetBtn = document.getElementById("resetBtn");
+  if (resetBtn) resetBtn.addEventListener("click", resetAll);
+
+  document.querySelectorAll('[data-role="structure-name"]').forEach((el) => {
+    el.addEventListener("input", (e) => {
+      const s = findStructure(el.dataset.sid);
+      if (s) s.name = e.target.value;
+      // don't re-render (would lose focus) — just keep state in sync
+    });
+  });
+
+  document.querySelectorAll('[data-role="remove-structure"]').forEach((el) => {
+    el.addEventListener("click", () => removeStructure(el.dataset.sid));
+  });
+
+  // Data file dropzones
+  document.querySelectorAll('[data-role="dropzone"]').forEach((el) => {
+    const sid = el.dataset.sid, kind = el.dataset.kind;
+    const input = el.querySelector('[data-role="file-input"]');
+    el.addEventListener("click", (e) => { if (e.target.closest('[data-role="clear-file"]')) return; input.click(); });
+    el.addEventListener("dragover", (e) => { e.preventDefault(); el.classList.add("drag"); });
+    el.addEventListener("dragleave", () => el.classList.remove("drag"));
+    el.addEventListener("drop", (e) => {
+      e.preventDefault(); el.classList.remove("drag");
+      const f = e.dataTransfer.files[0];
+      if (f) setStructureFile(sid, kind, f);
+    });
+    input.addEventListener("change", (e) => {
+      const f = e.target.files[0];
+      if (f) setStructureFile(sid, kind, f);
+      e.target.value = "";
+    });
+  });
+
+  document.querySelectorAll('[data-role="clear-file"]').forEach((el) => {
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      clearStructureFile(el.dataset.sid, el.dataset.kind);
+    });
+  });
+
+  // Image slots
+  document.querySelectorAll('[data-role="image-drop"]').forEach((el) => {
+    const sid = el.dataset.sid, field = el.dataset.field;
+    el.addEventListener("click", (e) => {
+      if (e.target.closest('[data-role="clear-image"]')) return;
+      const input = el.closest(".structure-card-body").querySelector('[data-role="image-input"]');
+      input.dataset.field = field;
+      input.click();
+    });
+    el.addEventListener("dragover", (e) => { e.preventDefault(); el.classList.add("drag"); });
+    el.addEventListener("dragleave", () => el.classList.remove("drag"));
+    el.addEventListener("drop", (e) => {
+      e.preventDefault(); el.classList.remove("drag");
+      const f = e.dataTransfer.files[0];
+      if (f && f.type.startsWith("image/")) setStructureImage(sid, field, f);
+    });
+  });
+
+  document.querySelectorAll('[data-role="image-input"]').forEach((el) => {
+    el.addEventListener("change", (e) => {
+      const f = e.target.files[0];
+      const field = el.dataset.field;
+      const sid = el.closest(".structure-card").dataset.sid;
+      if (f && field) setStructureImage(sid, field, f);
+      e.target.value = "";
+    });
+  });
+
+  document.querySelectorAll('[data-role="clear-image"]').forEach((el) => {
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      clearStructureImage(el.dataset.sid, el.dataset.field);
+    });
+  });
+}
+
+function resetResultSilently() {
+  // Cheap reset of the generated-result state without a full re-render (keeps input focus).
+  // Deliberately does NOT revoke pdfPreviewUrl here: if a preview <iframe> is currently on
+  // screen, revoking its blob URL without re-rendering the DOM would break the visible
+  // preview mid-edit. The URL gets cleaned up properly on the next real render instead.
+  state.stage = "idle"; state.pdfBlob = null; state.errorMsg = "";
+}
+
+function addStructure() {
+  state.structures.push(makeStructure(state.structures.length));
+  resetResult();
+  render();
+}
+
+function removeStructure(id) {
+  const removed = findStructure(id);
+  if (removed) Object.values(removed.images).forEach((img) => img && URL.revokeObjectURL(img.preview));
+  state.structures = state.structures.filter((s) => s.id !== id);
+  resetResult();
+  render();
+}
+
+function setStructureFile(sid, kind, file) {
+  const s = findStructure(sid);
+  if (!s) return;
+  if (kind === "variables") s.variablesFile = file;
+  else s.annotationsFile = file;
+  resetResult();
+  render();
+}
+
+function clearStructureFile(sid, kind) {
+  const s = findStructure(sid);
+  if (!s) return;
+  if (kind === "variables") s.variablesFile = null;
+  else s.annotationsFile = null;
+  resetResult();
+  render();
+}
+
+function setStructureImage(sid, field, file) {
+  const s = findStructure(sid);
+  if (!s) return;
+  const prev = s.images[field];
+  if (prev) URL.revokeObjectURL(prev.preview);
+  s.images[field] = { file, preview: URL.createObjectURL(file) };
+  resetResult();
+  render();
+}
+
+function clearStructureImage(sid, field) {
+  const s = findStructure(sid);
+  if (!s) return;
+  const prev = s.images[field];
+  if (prev) URL.revokeObjectURL(prev.preview);
+  delete s.images[field];
+  resetResult();
+  render();
+}
+
+// Initial render
+render();
+</script>
+</body>
+</html>
